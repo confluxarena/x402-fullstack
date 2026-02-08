@@ -32,6 +32,7 @@ export const env = {
 
   // Facilitator
   facilitatorKey: process.env.FACILITATOR_KEY || '',
+  facilitatorHost: process.env.FACILITATOR_HOST || '127.0.0.1',
   facilitatorPort: parseInt(process.env.FACILITATOR_PORT || '3851'),
 
   // AI

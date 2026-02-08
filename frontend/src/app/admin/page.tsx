@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { NETWORKS } from '@/lib/networks';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
@@ -209,7 +210,7 @@ export default function AdminPage() {
         {/* No Payments */}
         {stats && stats.total_payments === 0 && (
           <div style={{ ...cardStyle, padding: 40, textAlign: 'center', color: 'var(--fg-muted)' }}>
-            No payments on {network} yet. Try the <a href="/x402-app" style={{ color: 'var(--primary)' }}>demo</a>.
+            No payments on {network} yet. Try the <Link href="/" style={{ color: 'var(--primary)' }}>demo</Link>.
           </div>
         )}
 
@@ -282,9 +283,9 @@ export default function AdminPage() {
         )}
 
         <div className="x402-footer">
-          <a href="/x402-app">Demo</a> &middot;{' '}
-          <a href="/x402-app/history">History</a> &middot;{' '}
-          <a href="/x402-app/pay">API Reference</a>
+          <Link href="/">Demo</Link> &middot;{' '}
+          <Link href="/history">History</Link> &middot;{' '}
+          <Link href="/pay">API Reference</Link>
         </div>
       </div>
     </>

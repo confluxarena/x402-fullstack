@@ -538,6 +538,7 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | `PAYMENT_CONTRACT_TESTNET` | Yes | `0xdd27...a022` | Contract on testnet |
 | `PAYMENT_CONTRACT_MAINNET` | Yes | `0x2496...8680` | Contract on mainnet |
 | `FACILITATOR_KEY` | Yes | — | Shared secret (seller ↔ facilitator) |
+| `FACILITATOR_HOST` | No | `127.0.0.1` | Facilitator host (`facilitator` for Docker) |
 | `FACILITATOR_PORT` | No | `3851` | Facilitator port |
 | `SELLER_PORT` | No | `3852` | Seller API port |
 | `CLAUDE_API_KEY` | Yes | — | Anthropic API key for AI endpoint |

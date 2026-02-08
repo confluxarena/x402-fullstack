@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
 const nextConfig = {
   output: 'standalone',
-  basePath: '/x402-app',
-  assetPrefix: '/x402-app',
+  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
 };
 
 module.exports = nextConfig;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { NETWORKS } from '@/lib/networks';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
@@ -137,9 +138,9 @@ export default function HistoryPage() {
                     fontSize: 14,
                   }}>
                     No payments on {net.name} yet. Try the{' '}
-                    <a href="/x402-app" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                    <Link href="/" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
                       demo
-                    </a>.
+                    </Link>.
                   </td>
                 </tr>
               )}
@@ -226,9 +227,9 @@ export default function HistoryPage() {
         )}
 
         <div className="x402-footer">
-          <a href="/x402-app">Demo</a> &middot;{' '}
-          <a href="/x402-app/admin">Admin</a> &middot;{' '}
-          <a href="/x402-app/pay">API Reference</a>
+          <Link href="/">Demo</Link> &middot;{' '}
+          <Link href="/admin">Admin</Link> &middot;{' '}
+          <Link href="/pay">API Reference</Link>
         </div>
       </div>
     </>

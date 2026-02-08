@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { NETWORKS } from '@/lib/networks';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
@@ -119,9 +120,9 @@ export default function PayPage() {
         )}
 
         <div className="x402-footer">
-          <a href="/x402-app">Demo</a> &middot;{' '}
-          <a href="/x402-app/history">History</a> &middot;{' '}
-          <a href="/x402-app/admin">Admin</a> &middot;{' '}
+          <Link href="/">Demo</Link> &middot;{' '}
+          <Link href="/history">History</Link> &middot;{' '}
+          <Link href="/admin">Admin</Link> &middot;{' '}
           <a href="https://www.x402.org" target="_blank" rel="noopener noreferrer">x402 Protocol</a>
         </div>
       </div>

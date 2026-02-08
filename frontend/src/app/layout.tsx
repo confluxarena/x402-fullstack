@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,12 +20,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <nav className="nav-bar">
-          <a href="/x402-app" className="nav-logo">x402</a>
+          <Link href="/" className="nav-logo">x402</Link>
           <div className="nav-links">
-            <a href="/x402-app">Demo</a>
-            <a href="/x402-app/pay">API</a>
-            <a href="/x402-app/history">History</a>
-            <a href="/x402-app/admin">Admin</a>
+            <Link href="/">Demo</Link>
+            <Link href="/pay">API</Link>
+            <Link href="/history">History</Link>
+            <Link href="/admin">Admin</Link>
             <a
               href="https://efaucet.confluxnetwork.org/"
               target="_blank"

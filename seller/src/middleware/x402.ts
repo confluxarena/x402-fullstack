@@ -19,7 +19,7 @@ import { env } from '../config/env.js';
 import { getNetwork, type TokenConfig, type NetworkConfig } from '../config/networks.js';
 import type { X402Env, SettlementResult } from '../types.js';
 
-const FACILITATOR_URL = `http://127.0.0.1:${env.facilitatorPort}`;
+const FACILITATOR_URL = `http://${env.facilitatorHost}:${env.facilitatorPort}`;
 
 const PAYMENT_ABI = [
   'function payNative(bytes32 invoiceId) external payable',

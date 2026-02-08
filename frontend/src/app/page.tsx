@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { ethers } from 'ethers';
 import { NETWORKS, type Token } from '@/lib/networks';
 import { payAndFetch, formatAmount } from '@/lib/x402-client';
@@ -607,9 +608,9 @@ export default function Home() {
 
         {/* Footer */}
         <div className="x402-footer">
-          <a href="/x402-app/pay">API</a> &middot;{' '}
-          <a href="/x402-app/history">History</a> &middot;{' '}
-          <a href="/x402-app/admin">Admin</a> &middot;{' '}
+          <Link href="/pay">API</Link> &middot;{' '}
+          <Link href="/history">History</Link> &middot;{' '}
+          <Link href="/admin">Admin</Link> &middot;{' '}
           <a
             href="https://github.com/confluxarena/x402-fullstack"
             target="_blank"
