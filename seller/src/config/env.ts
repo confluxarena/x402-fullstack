@@ -42,4 +42,7 @@ export const env = {
   sellerPort: parseInt(process.env.SELLER_PORT || '3850'),
   priceCfx: process.env.API_PRICE_CFX || '1000000000000000',
   priceToken: process.env.API_PRICE_TOKEN || '100',
+
+  // Demo mode (testnet only)
+  demoKey: process.env.AGENT_PRIVATE_KEY || '',
 };

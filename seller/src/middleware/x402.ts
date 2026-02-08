@@ -14,11 +14,16 @@
  */
 
 import type { Context, Next } from 'hono';
+import { ethers } from 'ethers';
 import { env } from '../config/env.js';
 import { getNetwork, type TokenConfig, type NetworkConfig } from '../config/networks.js';
 import type { X402Env, SettlementResult } from '../types.js';
 
 const FACILITATOR_URL = `http://127.0.0.1:${env.facilitatorPort}`;
+
+const PAYMENT_ABI = [
+  'function payNative(bytes32 invoiceId) external payable',
+];
 
 /**
  * Creates x402 middleware for a specific token
@@ -41,7 +46,22 @@ export function x402(tokenSymbol?: string) {
       ? env.paymentContract.testnet
       : env.paymentContract.mainnet;
 
+    const isDemo = c.req.query('demo') === '1';
+
     if (!paymentHeader) {
+      // Demo mode: server pays with its own key on testnet (native CFX only)
+      if (isDemo && networkName === 'testnet' && token.paymentMethod === 'native' && env.demoKey) {
+        const demoResult = await demoPayNative(network, token, paymentContract);
+        if (demoResult.success) {
+          c.set('x402', demoResult);
+          c.set('x402Token', token);
+          c.set('x402Network', network);
+          await next();
+          return;
+        }
+        return c.json({ error: 'Demo payment failed', message: demoResult.error }, 500);
+      }
+
       return send402(c, network, token, paymentContract);
     }
 
@@ -207,6 +227,39 @@ async function callFacilitator(endpoint: string, data: any): Promise<any> {
   } catch (err: any) {
     console.error(`[x402] Facilitator error (${endpoint}):`, err.message);
     return null;
+  }
+}
+
+/**
+ * Demo mode: server pays native CFX on testnet using its own agent key
+ */
+async function demoPayNative(
+  network: NetworkConfig,
+  token: TokenConfig,
+  paymentContract: string,
+): Promise<SettlementResult> {
+  try {
+    const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+    const wallet = new ethers.Wallet(env.demoKey, provider);
+    const contract = new ethers.Contract(paymentContract, PAYMENT_ABI, wallet);
+    const invoiceId = ethers.zeroPadValue(ethers.toUtf8Bytes('x402-demo'), 32);
+
+    const tx = await contract.payNative(invoiceId, {
+      value: token.pricePerQuery,
+      gasLimit: 100_000,
+    });
+    const receipt = await tx.wait();
+
+    console.log(`[x402] Demo payment: ${receipt!.hash} (${wallet.address})`);
+
+    return {
+      success: true,
+      transaction: receipt!.hash,
+      payer: wallet.address,
+    };
+  } catch (err: any) {
+    console.error('[x402] Demo payment error:', err.message);
+    return { success: false, error: err.message };
   }
 }
 

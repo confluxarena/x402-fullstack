@@ -173,14 +173,25 @@ export default function Home() {
         }
         await sleep(400);
 
-        // Step 3: Pay (not available in server mode)
-        updateStep('pay', { visible: true, status: 'error', detail: 'Server demo cannot make real payments.\nSwitch to "Pay with Wallet" mode.' });
+        // Step 3: Pay (server demo only supports native CFX on testnet)
+        const isTestnetNative = network === 'testnet' && token === 'CFX';
+        updateStep('pay', {
+          visible: true,
+          status: 'error',
+          detail: isTestnetNative
+            ? 'Server demo payment failed.\nCheck server logs.'
+            : `Server demo only auto-pays native CFX on testnet.\nFor ${token} — use "Pay with Wallet" mode.`,
+        });
         await sleep(300);
 
         // Step 4: Skip
         updateStep('settle', { visible: true, status: 'error', detail: 'Payment required to proceed' });
 
-        setError('Payment required — use "Pay with Wallet" mode to complete a real payment');
+        setError(
+          isTestnetNative
+            ? 'Server demo payment failed — check server configuration'
+            : `For ${token} payments — switch to "Pay with Wallet" mode`,
+        );
         return;
       }
 
@@ -191,28 +202,52 @@ export default function Home() {
         return;
       }
 
-      // Direct success (demo mode)
+      // Direct success (server paid via demo mode)
       const data = await res.json();
+      const payment = data.data?.payment;
+
       updateStep('request', {
         status: 'done',
-        detail: 'HTTP 200 — Success (demo mode)',
+        detail: 'HTTP 200 — Server paid automatically',
         badge: { text: '200', type: 'http-200' },
       });
-      await sleep(300);
+      await sleep(400);
 
-      updateStep('parse', { visible: true, status: 'done', detail: 'No payment required (demo)' });
-      await sleep(200);
-      updateStep('pay', { visible: true, status: 'done', detail: 'Skipped — demo mode' });
-      await sleep(200);
-      updateStep('settle', { visible: true, status: 'done', detail: 'Response received' });
+      updateStep('parse', { visible: true, status: 'active', detail: 'Parsing payment info...' });
+      await sleep(400);
+      updateStep('parse', {
+        status: 'done',
+        detail: payment
+          ? `Token: ${payment.token} (native)\nAmount: ${payment.amount} ${payment.token}\nPayer: ${payment.payer?.substring(0, 10)}...${payment.payer?.substring(38)}`
+          : 'Payment completed by server',
+      });
+      await sleep(400);
+
+      updateStep('pay', { visible: true, status: 'active', detail: 'Server agent paying on testnet...' });
+      await sleep(500);
+      updateStep('pay', {
+        status: 'done',
+        detail: payment?.tx_hash
+          ? `TX: ${payment.tx_hash.substring(0, 18)}...`
+          : 'Server demo payment completed',
+      });
+      await sleep(400);
+
+      updateStep('settle', { visible: true, status: 'active', detail: 'Settling on-chain...' });
+      await sleep(500);
+      updateStep('settle', {
+        status: 'done',
+        detail: 'Paid & settled successfully',
+        badge: { text: '200', type: 'http-200' },
+      });
       await sleep(300);
 
       // Show answer
       setAnswerMeta(
         `${data.data?.tokens_used || 0} tokens \u00B7 ${data.data?.model || 'claude'}`,
       );
-      if (data.data?.payment?.tx_hash) {
-        setTxHash(data.data.payment.tx_hash);
+      if (payment?.tx_hash) {
+        setTxHash(payment.tx_hash);
       }
       setAnswerVisible(true);
       await sleep(200);

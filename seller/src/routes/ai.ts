@@ -20,13 +20,28 @@ ai.get('/', x402(), async (c) => {
     return c.json({ error: 'Question too long (max 500 characters)' }, 422);
   }
 
-  if (!env.claudeApiKey) {
-    return c.json({ error: 'AI service not configured' }, 503);
-  }
-
   const settlement = c.get('x402');
   const token = c.get('x402Token');
   const network = c.get('x402Network');
+
+  // Fallback response when Claude API key is not configured
+  if (!env.claudeApiKey) {
+    return c.json({
+      success: true,
+      data: {
+        answer: `x402 Protocol Demo: Your payment of ${formatTokenAmount(token.pricePerQuery, token.decimals)} ${token.symbol} was successfully processed! The x402 protocol enables HTTP 402 machine-to-machine payments on Conflux eSpace. This demo proves the full payment flow works: request → 402 → pay → settle → response. To get AI-powered answers, configure the CLAUDE_API_KEY environment variable.`,
+        model: 'fallback',
+        tokens_used: 0,
+        payment: {
+          tx_hash: settlement.transaction,
+          payer: settlement.payer,
+          amount: formatTokenAmount(token.pricePerQuery, token.decimals),
+          token: token.symbol,
+          network: network.name,
+        },
+      },
+    });
+  }
 
   // Call Claude API
   const systemPrompt = `You are a helpful AI assistant specializing in:
