@@ -31,6 +31,9 @@ const API_URL = process.env.AGENT_API_URL || 'http://localhost:3850';
 const SPEND_CAP = parseFloat(process.env.AGENT_SPEND_CAP || '1.0');
 const PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY || '';
 
+// Spending tracker (resets per process/session)
+let totalSpent = 0;
+
 const NETWORKS: Record<number, { rpc: string; explorer: string }> = {
   71: { rpc: 'https://evmtestnet.confluxrpc.com', explorer: 'https://evmtestnet.confluxscan.org' },
   1030: { rpc: 'https://evm.confluxrpc.com', explorer: 'https://evm.confluxscan.io' },
@@ -145,6 +148,18 @@ async function main() {
   kv('Price', `${amountHuman} ${tokenSymbol}`, c.yellow);
   kv('Pay to', requirements.payTo.substring(0, 12) + '...', c.dim);
   kv('Chain', `${chainId}`, c.blue);
+
+  // ── Spending cap check ──
+  const cost = parseFloat(amountHuman);
+  if (totalSpent + cost > SPEND_CAP) {
+    console.log(`\n  ${c.bgRed}${c.white}${c.bold} SPENDING CAP EXCEEDED ${c.reset}`);
+    kv('Spent', `${totalSpent}`, c.red);
+    kv('This request', `${amountHuman}`, c.red);
+    kv('Cap', `${SPEND_CAP}`, c.red);
+    console.log(`\n  ${c.dim}Set AGENT_SPEND_CAP to increase the limit.${c.reset}\n`);
+    process.exit(1);
+  }
+  kv('Spend cap', `${totalSpent + cost} / ${SPEND_CAP} ${tokenSymbol}`, c.dim);
 
   // ═══ Step 2: Connect wallet ═══
   step(2, 5, '\u{1F4B0}', 'Connecting agent wallet...');
@@ -274,6 +289,9 @@ async function main() {
     console.error(JSON.stringify(data, null, 2));
     process.exit(1);
   }
+
+  // Update spending tracker
+  totalSpent += cost;
 
   console.log(`\n  ${c.bgGreen}${c.white}${c.bold} HTTP 200 — PAID & SETTLED ${c.reset}`);
 

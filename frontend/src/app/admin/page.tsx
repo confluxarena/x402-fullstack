@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import NetworkTabs from '@/components/NetworkTabs';
 import { NETWORKS } from '@/lib/networks';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
@@ -23,7 +22,6 @@ export default function AdminPage() {
   const net = NETWORKS[network];
 
   useEffect(() => {
-    // Check seller health
     fetch(`${SELLER_URL}/health`)
       .then((r) => r.json())
       .then((data) => {
@@ -32,120 +30,200 @@ export default function AdminPage() {
       })
       .catch(() => setSellerOk(false));
 
-    // Facilitator is internal, seller proxies it
     setFacilitatorOk(null);
   }, [network]);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-
-      <NetworkTabs active={network} onChange={setNetwork} />
-
-      {/* Service status */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatusCard title="Seller API" ok={sellerOk} url={SELLER_URL} />
-        <StatusCard title="Facilitator" ok={facilitatorOk} url="Internal :3849" />
-        <StatusCard title="Database" ok={sellerOk} url="PostgreSQL 16" />
+    <>
+      <div className="hero">
+        <div className="hero-badge">Admin Panel</div>
+        <h1>System Dashboard</h1>
+        <p>Service health, network configuration, and supported tokens</p>
       </div>
 
-      {/* Network info */}
-      <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Network Configuration</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-500">Network</span>
-            <p className="text-white">{net.name}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">Chain ID</span>
-            <p className="text-white">{net.chainId}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">RPC</span>
-            <p className="text-white text-xs font-mono">{net.rpcUrl}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">Explorer</span>
-            <p>
-              <a href={net.explorerUrl} target="_blank" rel="noopener noreferrer"
-                 className="text-blue-400 hover:underline text-xs">{net.explorerUrl}</a>
-            </p>
+      <div className="container-main">
+        {/* Network Tabs */}
+        <div className="network-tabs">
+          {[
+            { id: 'testnet', label: 'Testnet', chainId: 71 },
+            { id: 'mainnet', label: 'Mainnet', chainId: 1030 },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              className={`network-tab ${network === tab.id ? 'active' : ''}`}
+              onClick={() => setNetwork(tab.id)}
+            >
+              {tab.label}
+              <span className="chain-id">({tab.chainId})</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Service Status */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+          <StatusCard title="Seller API" ok={sellerOk} url={SELLER_URL} />
+          <StatusCard title="Facilitator" ok={facilitatorOk} url="Internal :3851" />
+          <StatusCard title="Database" ok={sellerOk} url="PostgreSQL 16" />
+        </div>
+
+        {/* Network Info */}
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 20,
+        }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Network Configuration</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: 13 }}>
+            <InfoRow label="Network" value={net.name} />
+            <InfoRow label="Chain ID" value={String(net.chainId)} />
+            <InfoRow label="RPC" value={net.rpcUrl} mono />
+            <InfoRow
+              label="Explorer"
+              value={net.explorerUrl}
+              mono
+              link={net.explorerUrl}
+            />
           </div>
         </div>
-      </div>
 
-      {/* Token table */}
-      <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-        <h2 className="text-lg font-semibold p-4 border-b border-gray-800">
-          Supported Tokens ({net.tokens.length})
-        </h2>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-800 text-gray-500 text-xs">
-              <th className="text-left p-3">Symbol</th>
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">Address</th>
-              <th className="text-left p-3">Decimals</th>
-              <th className="text-left p-3">Method</th>
-            </tr>
-          </thead>
-          <tbody>
-            {net.tokens.map((t) => (
-              <tr key={t.symbol} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                <td className="p-3 font-semibold">{t.symbol}</td>
-                <td className="p-3 text-gray-400">{t.name}</td>
-                <td className="p-3 font-mono text-xs text-gray-500">
-                  {t.address === '0x0000000000000000000000000000000000000000'
-                    ? 'Native'
-                    : `${t.address.slice(0, 10)}...${t.address.slice(-6)}`}
-                </td>
-                <td className="p-3">{t.decimals}</td>
-                <td className="p-3">
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${
-                    t.paymentMethod === 'eip3009' ? 'bg-purple-900 text-purple-300' :
-                    t.paymentMethod === 'native' ? 'bg-green-900 text-green-300' :
-                    'bg-blue-900 text-blue-300'
-                  }`}>
-                    {t.paymentMethod}
-                  </span>
-                </td>
+        {/* Token Table */}
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '14px 16px',
+            borderBottom: '1px solid var(--border)',
+            fontSize: 15,
+            fontWeight: 700,
+          }}>
+            Supported Tokens ({net.tokens.length})
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Symbol', 'Name', 'Address', 'Decimals', 'Method'].map((h) => (
+                  <th key={h} style={{
+                    textAlign: 'left',
+                    padding: '10px 14px',
+                    color: 'var(--fg-muted)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}>
+                    {h}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {net.tokens.map((t) => (
+                <tr key={t.symbol} style={{ borderBottom: '1px solid rgba(56,161,216,0.08)' }}>
+                  <td style={{ padding: '10px 14px', fontWeight: 700 }}>{t.symbol}</td>
+                  <td style={{ padding: '10px 14px', color: 'var(--fg-muted)' }}>{t.name}</td>
+                  <td style={{ padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fg-muted)' }}>
+                    {t.address === '0x0000000000000000000000000000000000000000'
+                      ? 'Native'
+                      : `${t.address.slice(0, 10)}...${t.address.slice(-6)}`}
+                  </td>
+                  <td style={{ padding: '10px 14px' }}>{t.decimals}</td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <span className={`token-method method-${t.paymentMethod}`} style={{ position: 'static' }}>
+                      {t.paymentMethod === 'eip3009' ? '3009' : t.paymentMethod === 'erc20' ? 'ERC20' : 'CFX'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Health JSON */}
-      {health && (
-        <details className="mt-6">
-          <summary className="text-gray-500 text-sm cursor-pointer hover:text-gray-300">
-            Raw health response
-          </summary>
-          <pre className="mt-2 p-4 bg-gray-900 border border-gray-800 rounded-lg text-xs text-gray-400 overflow-x-auto">
-            {JSON.stringify(health, null, 2)}
-          </pre>
-        </details>
-      )}
-    </div>
+        {/* Raw Health */}
+        {health && (
+          <details style={{ marginTop: 20 }}>
+            <summary style={{ color: 'var(--fg-muted)', fontSize: 12, cursor: 'pointer' }}>
+              Raw health response
+            </summary>
+            <pre style={{
+              marginTop: 8,
+              padding: 16,
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              fontSize: 11,
+              fontFamily: 'var(--mono)',
+              color: 'var(--fg-muted)',
+              overflowX: 'auto',
+            }}>
+              {JSON.stringify(health, null, 2)}
+            </pre>
+          </details>
+        )}
+
+        <div className="x402-footer">
+          <a href="/x402-app">Back to Demo</a>
+        </div>
+      </div>
+    </>
   );
 }
 
 function StatusCard({ title, ok, url }: { title: string; ok: boolean | null; url: string }) {
+  const dotColor = ok === true ? 'var(--success)' : ok === false ? 'var(--danger)' : 'var(--warning)';
+  const statusText = ok === true ? 'Online' : ok === false ? 'Offline' : 'Unknown';
+  const statusColor = dotColor;
+
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium">{title}</span>
-        <span className={`w-2 h-2 rounded-full ${
-          ok === true ? 'bg-green-400' : ok === false ? 'bg-red-400' : 'bg-yellow-400'
-        }`} />
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 12,
+      padding: 16,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{title}</span>
+        <span style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: dotColor,
+          display: 'inline-block',
+        }} />
       </div>
-      <div className="text-xs text-gray-500">{url}</div>
-      <div className="text-xs mt-1">
-        {ok === true ? <span className="text-green-400">Online</span> :
-         ok === false ? <span className="text-red-400">Offline</span> :
-         <span className="text-yellow-400">Unknown</span>}
-      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--mono)' }}>{url}</div>
+      <div style={{ fontSize: 12, marginTop: 4, color: statusColor, fontWeight: 600 }}>{statusText}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, mono, link }: { label: string; value: string; mono?: boolean; link?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginBottom: 2 }}>{label}</div>
+      {link ? (
+        <a href={link} target="_blank" rel="noopener noreferrer" style={{
+          fontSize: 12,
+          fontFamily: mono ? 'var(--mono)' : 'var(--sans)',
+          color: 'var(--primary)',
+          textDecoration: 'none',
+        }}>
+          {value}
+        </a>
+      ) : (
+        <div style={{
+          fontSize: 13,
+          fontFamily: mono ? 'var(--mono)' : 'var(--sans)',
+          color: 'var(--fg)',
+          wordBreak: 'break-all',
+        }}>
+          {value}
+        </div>
+      )}
     </div>
   );
 }

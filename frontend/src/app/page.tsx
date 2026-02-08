@@ -1,19 +1,36 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { NETWORKS, type Token } from '@/lib/networks';
 import { payAndFetch, formatAmount } from '@/lib/x402-client';
 import { connectWallet, getAddress, shortAddress } from '@/lib/wallet';
-import NetworkTabs from '@/components/NetworkTabs';
-import TokenSelector from '@/components/TokenSelector';
-import WalletButton from '@/components/WalletButton';
-import StatusLog from '@/components/StatusLog';
-import ResultCard from '@/components/ResultCard';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
 
 type Mode = 'server' | 'wallet';
+type StepStatus = 'pending' | 'active' | 'done' | 'error';
+
+interface Step {
+  id: string;
+  icon: string;
+  title: string;
+  status: StepStatus;
+  detail: string;
+  badge?: { text: string; type: 'http-402' | 'http-200' };
+  visible: boolean;
+}
+
+const STEP_DEFS = [
+  { id: 'request', icon: '\u{1F310}', title: 'Request API' },
+  { id: 'parse', icon: '\u{1F4B0}', title: 'Parse payment envelope' },
+  { id: 'pay', icon: '\u270D\uFE0F', title: 'Execute payment' },
+  { id: 'settle', icon: '\u{1F680}', title: 'Settle & get response' },
+];
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export default function Home() {
   const [network, setNetwork] = useState('testnet');
@@ -21,8 +38,6 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>('server');
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
 
   // Wallet state
@@ -30,19 +45,66 @@ export default function Home() {
   const [connecting, setConnecting] = useState(false);
   const providerRef = useRef<ethers.BrowserProvider | null>(null);
 
+  // Timeline state
+  const [steps, setSteps] = useState<Step[]>([]);
+
+  // Answer state
+  const [answer, setAnswer] = useState('');
+  const [answerMeta, setAnswerMeta] = useState('');
+  const [answerVisible, setAnswerVisible] = useState(false);
+  const [txHash, setTxHash] = useState('');
+  const [typing, setTyping] = useState(false);
+
   const net = NETWORKS[network];
   const tokens = net.tokens;
+  const selectedToken = tokens.find((t) => t.symbol === token) || tokens[0];
 
-  const addLog = useCallback((msg: string) => {
-    setLogs((prev) => [...prev, msg]);
+  const resetTimeline = useCallback(() => {
+    setSteps(
+      STEP_DEFS.map((d) => ({
+        ...d,
+        status: 'pending' as StepStatus,
+        detail: '',
+        visible: false,
+      })),
+    );
+    setAnswer('');
+    setAnswerMeta('');
+    setAnswerVisible(false);
+    setTxHash('');
+    setError('');
+    setTyping(false);
+  }, []);
+
+  const updateStep = useCallback(
+    (
+      id: string,
+      updates: Partial<Pick<Step, 'status' | 'detail' | 'badge' | 'visible'>>,
+    ) => {
+      setSteps((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+      );
+    },
+    [],
+  );
+
+  // Typewriter effect
+  const typewrite = useCallback(async (text: string) => {
+    setTyping(true);
+    const words = text.split(' ');
+    let current = '';
+    for (let i = 0; i < words.length; i++) {
+      current += (i > 0 ? ' ' : '') + words[i];
+      setAnswer(current);
+      await sleep(30 + Math.random() * 30);
+    }
+    setTyping(false);
   }, []);
 
   const handleNetworkChange = (n: string) => {
     setNetwork(n);
-    setToken('CFX'); // Reset token on network change
-    setResult(null);
-    setError('');
-    setLogs([]);
+    setToken('CFX');
+    resetTimeline();
   };
 
   const handleConnect = async () => {
@@ -64,42 +126,97 @@ export default function Home() {
     providerRef.current = null;
   };
 
-  // Server Demo: proxy call through seller API (no wallet needed)
+  // Server Demo flow
   const handleServerDemo = async () => {
     setLoading(true);
-    setLogs([]);
-    setResult(null);
-    setError('');
+    resetTimeline();
+    await sleep(50); // Let state settle
 
     const q = question || 'What is Conflux Network?';
 
     try {
-      addLog(`GET ${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&demo=1`);
+      // Step 1: Request
+      updateStep('request', { visible: true, status: 'active', detail: `GET ${SELLER_URL}/ai?q=${q.substring(0, 30)}...` });
+      await sleep(600);
+
       const res = await fetch(
         `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&demo=1`,
       );
-      const data = await res.json();
 
-      if (!res.ok) {
-        if (res.status === 402) {
-          addLog('Received HTTP 402 — Payment Required');
-          const paymentHeader = res.headers.get('PAYMENT-REQUIRED') || res.headers.get('payment-required');
-          if (paymentHeader) {
-            const envelope = JSON.parse(atob(paymentHeader));
-            const req = envelope.accepts[0];
-            addLog(`Token: ${req.extra.symbol} (${req.extra.paymentMethod})`);
-            addLog(`Amount: ${formatAmount(req.amount, req.extra.decimals)} ${req.extra.symbol}`);
-            addLog(`Pay to: ${req.payTo}`);
-          }
-          setError('Payment required — use "Pay with Wallet" mode to complete the payment');
+      if (res.status === 402) {
+        const paymentHeader =
+          res.headers.get('PAYMENT-REQUIRED') ||
+          res.headers.get('payment-required');
+
+        updateStep('request', {
+          status: 'done',
+          detail: 'HTTP 402 — Payment Required',
+          badge: { text: '402', type: 'http-402' },
+        });
+        await sleep(400);
+
+        // Step 2: Parse envelope
+        updateStep('parse', { visible: true, status: 'active', detail: 'Decoding PAYMENT-REQUIRED header...' });
+        await sleep(500);
+
+        if (paymentHeader) {
+          const envelope = JSON.parse(atob(paymentHeader));
+          const req = envelope.accepts[0];
+          const amountStr = formatAmount(req.amount, req.extra.decimals);
+
+          updateStep('parse', {
+            status: 'done',
+            detail: `Token: ${req.extra.symbol} (${req.extra.paymentMethod})\nAmount: ${amountStr} ${req.extra.symbol}\nPay to: ${req.payTo.substring(0, 10)}...${req.payTo.substring(38)}`,
+          });
         } else {
-          setError(data.error || data.message || `HTTP ${res.status}`);
+          updateStep('parse', { status: 'done', detail: 'No envelope found' });
         }
+        await sleep(400);
+
+        // Step 3: Pay (not available in server mode)
+        updateStep('pay', { visible: true, status: 'error', detail: 'Server demo cannot make real payments.\nSwitch to "Pay with Wallet" mode.' });
+        await sleep(300);
+
+        // Step 4: Skip
+        updateStep('settle', { visible: true, status: 'error', detail: 'Payment required to proceed' });
+
+        setError('Payment required — use "Pay with Wallet" mode to complete a real payment');
         return;
       }
 
-      addLog('HTTP 200 — Success');
-      setResult(data.data);
+      if (!res.ok) {
+        const data = await res.json();
+        updateStep('request', { status: 'error', detail: data.error || `HTTP ${res.status}` });
+        setError(data.error || data.message || `HTTP ${res.status}`);
+        return;
+      }
+
+      // Direct success (demo mode)
+      const data = await res.json();
+      updateStep('request', {
+        status: 'done',
+        detail: 'HTTP 200 — Success (demo mode)',
+        badge: { text: '200', type: 'http-200' },
+      });
+      await sleep(300);
+
+      updateStep('parse', { visible: true, status: 'done', detail: 'No payment required (demo)' });
+      await sleep(200);
+      updateStep('pay', { visible: true, status: 'done', detail: 'Skipped — demo mode' });
+      await sleep(200);
+      updateStep('settle', { visible: true, status: 'done', detail: 'Response received' });
+      await sleep(300);
+
+      // Show answer
+      setAnswerMeta(
+        `${data.data?.tokens_used || 0} tokens \u00B7 ${data.data?.model || 'claude'}`,
+      );
+      if (data.data?.payment?.tx_hash) {
+        setTxHash(data.data.payment.tx_hash);
+      }
+      setAnswerVisible(true);
+      await sleep(200);
+      await typewrite(data.data?.answer || 'No response received.');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -107,7 +224,7 @@ export default function Home() {
     }
   };
 
-  // Wallet mode: full x402 flow
+  // Wallet flow
   const handleWalletPay = async () => {
     if (!providerRef.current) {
       setError('Connect your wallet first');
@@ -115,9 +232,8 @@ export default function Home() {
     }
 
     setLoading(true);
-    setLogs([]);
-    setResult(null);
-    setError('');
+    resetTimeline();
+    await sleep(50);
 
     const q = question || 'What is Conflux Network?';
 
@@ -125,15 +241,72 @@ export default function Home() {
       const signer = await providerRef.current.getSigner();
       const url = `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}`;
 
-      const payResult = await payAndFetch(url, signer, addLog);
+      // Step 1
+      updateStep('request', { visible: true, status: 'active', detail: `GET ${url.substring(0, 50)}...` });
+      await sleep(400);
+
+      // Use payAndFetch with step updates
+      const onStatus = (msg: string) => {
+        if (msg.includes('Payment required')) {
+          updateStep('request', {
+            status: 'done',
+            detail: 'HTTP 402 — Payment Required',
+            badge: { text: '402', type: 'http-402' },
+          });
+          updateStep('parse', { visible: true, status: 'active', detail: 'Parsing payment envelope...' });
+        } else if (
+          msg.includes('EIP-3009') ||
+          msg.includes('ERC-20') ||
+          msg.includes('Native')
+        ) {
+          updateStep('parse', { status: 'done', detail: msg });
+          updateStep('pay', { visible: true, status: 'active', detail: msg });
+        } else if (msg.includes('Approving')) {
+          updateStep('pay', { status: 'active', detail: 'Approving token spend...' });
+        } else if (msg.includes('Approved')) {
+          updateStep('pay', { detail: 'Token approved. Preparing payment...' });
+        } else if (msg.includes('Sending')) {
+          updateStep('pay', { status: 'active', detail: msg });
+        } else if (msg.includes('paid request')) {
+          updateStep('pay', { status: 'done', detail: 'Payment signed' });
+          updateStep('settle', { visible: true, status: 'active', detail: 'Settling on-chain...' });
+        }
+      };
+
+      const payResult = await payAndFetch(url, signer, onStatus);
 
       if (!payResult.success) {
+        updateStep('settle', {
+          visible: true,
+          status: 'error',
+          detail: payResult.error || 'Payment failed',
+        });
         setError(payResult.error || 'Payment failed');
         return;
       }
 
-      addLog('Payment settled successfully!');
-      setResult(payResult.data);
+      updateStep('settle', {
+        status: 'done',
+        detail: `Paid & settled successfully`,
+        badge: { text: '200', type: 'http-200' },
+      });
+
+      await sleep(300);
+
+      // Show answer
+      if (payResult.data) {
+        setAnswerMeta(
+          `${payResult.data.tokens_used || 0} tokens \u00B7 ${payResult.data.model || 'claude'}`,
+        );
+        if (payResult.txHash || payResult.data?.payment?.tx_hash) {
+          setTxHash(payResult.txHash || payResult.data.payment.tx_hash);
+        }
+        setAnswerVisible(true);
+        await sleep(200);
+        await typewrite(
+          payResult.data.answer || 'No response received.',
+        );
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -142,101 +315,223 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">
-          x402 Protocol <span className="text-blue-400">Demo</span>
-        </h1>
-        <p className="text-gray-500 text-sm">
-          HTTP 402 Payment Required — Multi-token payments on Conflux eSpace
+    <>
+      {/* Hero */}
+      <div className="hero">
+        <div className="hero-badge">x402 Protocol &middot; Fullstack Demo</div>
+        <h1>Multi-Token Payment Demo</h1>
+        <p>
+          HTTP 402 payments on Conflux eSpace. 10 tokens, 3 payment methods,
+          <br />
+          Testnet + Mainnet. Pick a token and try it.
         </p>
       </div>
 
-      {/* Network Tabs */}
-      <NetworkTabs active={network} onChange={handleNetworkChange} />
-
-      {/* Token Selector */}
-      <TokenSelector tokens={tokens} selected={token} onChange={setToken} />
-
-      {/* Mode Tabs */}
-      <div className="flex gap-1 bg-gray-800 rounded-lg p-1 mb-6">
-        <button
-          onClick={() => setMode('server')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition ${
-            mode === 'server'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Server Demo
-        </button>
-        <button
-          onClick={() => setMode('wallet')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition ${
-            mode === 'wallet'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Pay with Wallet
-        </button>
-      </div>
-
-      {/* Wallet connect (wallet mode only) */}
-      {mode === 'wallet' && (
-        <div className="flex justify-end mb-4">
-          <WalletButton
-            address={address}
-            connecting={connecting}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
+      <div className="container-main">
+        {/* Network Tabs */}
+        <div className="network-tabs">
+          {[
+            { id: 'testnet', label: 'Testnet', chainId: 71 },
+            { id: 'mainnet', label: 'Mainnet', chainId: 1030 },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              className={`network-tab ${network === tab.id ? 'active' : ''}`}
+              onClick={() => handleNetworkChange(tab.id)}
+            >
+              {tab.label}
+              <span className="chain-id">({tab.chainId})</span>
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* Question input */}
-      <div className="space-y-3">
-        <input
-          type="text"
-          placeholder="Ask something about Conflux..."
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !loading) {
-              mode === 'server' ? handleServerDemo() : handleWalletPay();
-            }
-          }}
-          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-        />
-
-        <button
-          onClick={mode === 'server' ? handleServerDemo : handleWalletPay}
-          disabled={loading || (mode === 'wallet' && !address)}
-          className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          {loading ? 'Processing...' : mode === 'server' ? 'Send (Server Demo)' : `Pay & Ask (${token})`}
-        </button>
-      </div>
-
-      {/* Token info */}
-      <div className="mt-3 text-xs text-gray-500 flex items-center gap-4">
-        <span>Network: {net.name}</span>
-        <span>Token: {token}</span>
-        <span>Method: {tokens.find((t) => t.symbol === token)?.paymentMethod}</span>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mt-4 p-3 bg-red-950 border border-red-800 rounded-lg text-red-400 text-sm">
-          {error}
+        {/* Token Grid */}
+        <div className="token-grid">
+          {tokens.map((t) => (
+            <button
+              key={t.symbol}
+              className={`token-card ${token === t.symbol ? 'active' : ''}`}
+              onClick={() => {
+                setToken(t.symbol);
+                resetTimeline();
+              }}
+            >
+              <div className="token-symbol">{t.symbol}</div>
+              <div className="token-name">{t.name}</div>
+              <span className={`token-method method-${t.paymentMethod}`}>
+                {t.paymentMethod === 'eip3009'
+                  ? '3009'
+                  : t.paymentMethod === 'erc20'
+                    ? 'ERC20'
+                    : 'CFX'}
+              </span>
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* Status log */}
-      <StatusLog messages={logs} />
+        {/* Mode Tabs */}
+        <div className="mode-tabs">
+          <button
+            className={`mode-tab ${mode === 'server' ? 'active' : ''}`}
+            onClick={() => setMode('server')}
+          >
+            Server Demo
+          </button>
+          <button
+            className={`mode-tab ${mode === 'wallet' ? 'active' : ''}`}
+            onClick={() => setMode('wallet')}
+          >
+            Pay with Wallet
+          </button>
+        </div>
 
-      {/* Result */}
-      {result && <ResultCard data={result} explorerUrl={net.explorerUrl} />}
-    </div>
+        {/* Wallet Bar */}
+        {mode === 'wallet' && (
+          <div className="wallet-bar">
+            {address ? (
+              <>
+                <span className="wallet-address">
+                  {shortAddress(address)}
+                </span>
+                <button className="btn-disconnect" onClick={handleDisconnect}>
+                  Disconnect
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn-wallet"
+                onClick={handleConnect}
+                disabled={connecting}
+              >
+                {connecting ? (
+                  <>
+                    <span className="spinner" /> Connecting...
+                  </>
+                ) : (
+                  'Connect Wallet'
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Input Area */}
+        <div className="input-area">
+          <div className="input-row">
+            <input
+              type="text"
+              placeholder="Ask something about Conflux..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !loading) {
+                  mode === 'server' ? handleServerDemo() : handleWalletPay();
+                }
+              }}
+              maxLength={500}
+            />
+            <button
+              className="btn-ask"
+              onClick={mode === 'server' ? handleServerDemo : handleWalletPay}
+              disabled={loading || (mode === 'wallet' && !address)}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner" /> Processing...
+                </>
+              ) : mode === 'server' ? (
+                'Ask AI'
+              ) : (
+                `Pay & Ask (${token})`
+              )}
+            </button>
+          </div>
+          <div className="price-tag">
+            <span className="dot" />
+            <span>
+              {mode === 'server' ? 'Server demo' : 'Wallet payment'} &middot;{' '}
+              {net.name} &middot; {selectedToken.symbol} (
+              {selectedToken.paymentMethod})
+            </span>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && <div className="error-msg">{error}</div>}
+
+        {/* Timeline */}
+        {steps.length > 0 && (
+          <div className="timeline">
+            {steps.map((step) => (
+              <div
+                key={step.id}
+                className={`step ${step.visible ? 'visible' : ''}`}
+              >
+                <div className={`step-dot ${step.status}`}>{step.icon}</div>
+                <div className="step-card">
+                  <div className="step-title">
+                    {step.title}
+                    {step.badge && (
+                      <span className={`http-badge ${step.badge.type}`}>
+                        {step.badge.text}
+                      </span>
+                    )}
+                  </div>
+                  {step.detail && (
+                    <div className="step-detail">
+                      {step.detail.split('\n').map((line, i) => (
+                        <div key={i}>{line}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Answer Card */}
+        <div className={`answer-card ${answerVisible ? 'visible' : ''}`}>
+          <div className="answer-header">
+            <span className="answer-label">&#x2728; AI Response</span>
+            <span className="answer-meta">{answerMeta}</span>
+          </div>
+          <div className="answer-text">
+            {answer}
+            {typing && <span className="cursor" />}
+          </div>
+          {txHash && (
+            <a
+              className="tx-link"
+              href={`${net.explorerUrl}/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              &#x1F517; View on ConfluxScan
+            </a>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="x402-footer">
+          <a
+            href="https://github.com/confluxarena/x402-fullstack"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            x402 Fullstack
+          </a>{' '}
+          &middot;{' '}
+          <a
+            href="https://www.x402.org"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            x402 Protocol
+          </a>{' '}
+          &middot; Multi-token payments on Conflux eSpace
+        </div>
+      </div>
+    </>
   );
 }
