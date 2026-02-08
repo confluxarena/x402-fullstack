@@ -161,8 +161,8 @@ async function start() {
   const contract = cfg.network === 'testnet' ? cfg.paymentContract.testnet : cfg.paymentContract.mainnet;
   console.log(`[facilitator] Payment contract: ${contract || 'NOT SET'}`);
 
-  server.listen(cfg.port, '127.0.0.1', () => {
-    console.log(`[facilitator] Listening on http://127.0.0.1:${cfg.port}`);
+  server.listen(cfg.port, cfg.host, () => {
+    console.log(`[facilitator] Listening on http://${cfg.host}:${cfg.port}`);
     console.log('[facilitator] Endpoints:');
     console.log('  GET  /x402/health');
     console.log('  POST /x402/verify-eip3009   POST /x402/settle-eip3009');

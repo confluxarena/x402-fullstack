@@ -11,6 +11,7 @@ config({ path: resolve(__dirname, '../../.env') });
 
 export const cfg = {
   port: parseInt(process.env.FACILITATOR_PORT || '3851'),
+  host: process.env.FACILITATOR_BIND || '0.0.0.0',
   apiKey: process.env.FACILITATOR_KEY || '',
   relayerKey: process.env.RELAYER_PRIVATE_KEY || '',
   treasury: process.env.TREASURY_ADDRESS || '',
