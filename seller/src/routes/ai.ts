@@ -1,0 +1,114 @@
+/**
+ * AI endpoint — x402-gated Claude API
+ */
+
+import { Hono } from 'hono';
+import { x402 } from '../middleware/x402.js';
+import { env } from '../config/env.js';
+import { db } from '../config/database.js';
+
+const ai = new Hono();
+
+ai.get('/', x402(), async (c) => {
+  const question = c.req.query('q')?.trim();
+
+  if (!question) {
+    return c.json({ error: 'Query parameter "q" is required' }, 422);
+  }
+  if (question.length > 500) {
+    return c.json({ error: 'Question too long (max 500 characters)' }, 422);
+  }
+
+  if (!env.claudeApiKey) {
+    return c.json({ error: 'AI service not configured' }, 503);
+  }
+
+  const settlement = c.get('x402');
+  const token = c.get('x402Token');
+  const network = c.get('x402Network');
+
+  // Call Claude API
+  const systemPrompt = `You are a helpful AI assistant specializing in:
+- Conflux Network (eSpace, Core Space, PoW+PoS consensus, CFX token)
+- x402 protocol for machine-to-machine payments
+- DeFi concepts (DEX, staking, liquidity, yield farming)
+- Web3, blockchain, and smart contracts
+Keep answers concise (under 200 words). Be accurate and technical when needed.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.claudeApiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: env.claudeModel,
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: question }],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      console.error(`[ai] Anthropic API error (${res.status})`);
+      return c.json({ error: 'AI service error' }, 502);
+    }
+
+    const result: any = await res.json();
+    const answer = result.content?.[0]?.text || '';
+    const tokensUsed = (result.usage?.input_tokens || 0) + (result.usage?.output_tokens || 0);
+
+    // Log payment to database
+    try {
+      await db.query(
+        `INSERT INTO x402_payments (invoice_id, payer_address, token_address, token_symbol, amount, tx_hash, network, payment_method, settled_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          crypto.randomUUID().replace(/-/g, ''),
+          settlement.payer || '',
+          token.address,
+          token.symbol,
+          token.pricePerQuery,
+          settlement.transaction || '',
+          network.caip2,
+          token.paymentMethod,
+        ],
+      );
+    } catch (dbErr: any) {
+      console.error('[ai] DB log error:', dbErr.message);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        answer,
+        model: env.claudeModel,
+        tokens_used: tokensUsed,
+        payment: {
+          tx_hash: settlement.transaction,
+          payer: settlement.payer,
+          amount: formatTokenAmount(token.pricePerQuery, token.decimals),
+          token: token.symbol,
+          network: network.name,
+        },
+      },
+    });
+  } catch (err: any) {
+    console.error('[ai] Error:', err.message);
+    return c.json({ error: 'AI service unavailable' }, 503);
+  }
+});
+
+function formatTokenAmount(amount: string, decimals: number): string {
+  const val = BigInt(amount);
+  const divisor = BigInt(10 ** decimals);
+  const whole = val / divisor;
+  const frac = val % divisor;
+  const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '') || '0';
+  return `${whole}.${fracStr}`;
+}
+
+export { ai };
