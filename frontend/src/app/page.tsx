@@ -140,7 +140,7 @@ export default function Home() {
       await sleep(600);
 
       const res = await fetch(
-        `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&demo=1`,
+        `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&network=${network}&demo=1`,
       );
 
       if (res.status === 402) {
@@ -239,7 +239,7 @@ export default function Home() {
 
     try {
       const signer = await providerRef.current.getSigner();
-      const url = `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}`;
+      const url = `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&network=${network}`;
 
       // Step 1
       updateStep('request', { visible: true, status: 'active', detail: `GET ${url.substring(0, 50)}...` });

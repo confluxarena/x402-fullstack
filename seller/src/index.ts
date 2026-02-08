@@ -40,9 +40,10 @@ app.route('/ai', ai);
 
 // Token list endpoint
 app.get('/tokens', (c) => {
-  const network = getNetwork(env.network);
+  const networkName = c.req.query('network') || env.network;
+  const network = getNetwork(networkName);
   return c.json({
-    network: env.network,
+    network: networkName,
     chainId: network.chainId,
     tokens: Object.entries(network.tokens).map(([symbol, t]) => ({
       symbol,

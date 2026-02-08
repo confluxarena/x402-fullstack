@@ -25,7 +25,8 @@ const FACILITATOR_URL = `http://127.0.0.1:${env.facilitatorPort}`;
  */
 export function x402(tokenSymbol?: string) {
   return async (c: Context<X402Env>, next: Next) => {
-    const network = getNetwork(env.network);
+    const networkName = c.req.query('network') || env.network;
+    const network = getNetwork(networkName);
     const symbol = tokenSymbol || c.req.query('token') || getDefaultToken(network);
     const token = network.tokens[symbol];
 
@@ -36,12 +37,16 @@ export function x402(tokenSymbol?: string) {
     const paymentHeader = c.req.header('PAYMENT-SIGNATURE')
       || c.req.header('payment-signature');
 
+    const paymentContract = networkName === 'testnet'
+      ? env.paymentContract.testnet
+      : env.paymentContract.mainnet;
+
     if (!paymentHeader) {
-      return send402(c, network, token);
+      return send402(c, network, token, paymentContract);
     }
 
     // Verify and settle payment
-    const settlement = await verifyAndSettle(paymentHeader, network, token);
+    const settlement = await verifyAndSettle(paymentHeader, network, token, paymentContract);
 
     if (!settlement.success) {
       return c.json({
@@ -65,7 +70,7 @@ function getDefaultToken(network: NetworkConfig): string {
   return 'CFX';
 }
 
-function send402(c: Context, network: NetworkConfig, token: TokenConfig) {
+function send402(c: Context, network: NetworkConfig, token: TokenConfig, paymentContract: string) {
   const invoiceId = crypto.randomUUID().replace(/-/g, '');
   const nonce = crypto.randomUUID().replace(/-/g, '');
   const expiry = Math.floor(Date.now() / 1000) + 3600;
@@ -94,9 +99,7 @@ function send402(c: Context, network: NetworkConfig, token: TokenConfig) {
         symbol: token.symbol,
         decimals: token.decimals,
         ...(token.eip712Name ? { name: token.eip712Name, version: token.eip712Version } : {}),
-        paymentContract: env.network === 'testnet'
-          ? env.paymentContract.testnet
-          : env.paymentContract.mainnet,
+        paymentContract,
       },
     }],
   };
@@ -118,6 +121,7 @@ async function verifyAndSettle(
   paymentHeader: string,
   network: NetworkConfig,
   token: TokenConfig,
+  paymentContract: string,
 ): Promise<SettlementResult> {
   let payload: any;
   try {
@@ -151,9 +155,7 @@ async function verifyAndSettle(
       caip2: network.caip2,
     },
     treasury: env.treasury,
-    paymentContract: env.network === 'testnet'
-      ? env.paymentContract.testnet
-      : env.paymentContract.mainnet,
+    paymentContract,
   });
 
   if (!verifyResult || !verifyResult.valid) {
@@ -176,9 +178,7 @@ async function verifyAndSettle(
       caip2: network.caip2,
     },
     treasury: env.treasury,
-    paymentContract: env.network === 'testnet'
-      ? env.paymentContract.testnet
-      : env.paymentContract.mainnet,
+    paymentContract,
   });
 
   if (!settleResult || !settleResult.success) {

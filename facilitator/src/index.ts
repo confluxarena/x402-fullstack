@@ -18,14 +18,33 @@ import { verifyNative, settleNative } from './handlers/native.js';
 
 // ── Blockchain connection ──
 
-const networkCfg = NETWORKS[cfg.network];
-if (!networkCfg) {
+const defaultNetworkCfg = NETWORKS[cfg.network];
+if (!defaultNetworkCfg) {
   console.error(`[facilitator] Unknown network: ${cfg.network}`);
   process.exit(1);
 }
 
-const provider = new ethers.JsonRpcProvider(networkCfg.rpc);
-const wallet = new ethers.Wallet(cfg.relayerKey, provider);
+const defaultProvider = new ethers.JsonRpcProvider(defaultNetworkCfg.rpc);
+const defaultWallet = new ethers.Wallet(cfg.relayerKey, defaultProvider);
+
+// Provider cache for dynamic network selection
+const providerCache: Record<number, ethers.JsonRpcProvider> = {};
+const walletCache: Record<number, ethers.Wallet> = {};
+
+function getProviderForChain(chainId: number): ethers.JsonRpcProvider {
+  if (providerCache[chainId]) return providerCache[chainId];
+  const net = Object.values(NETWORKS).find((n) => n.chainId === chainId);
+  if (!net) throw new Error(`Unsupported chain: ${chainId}`);
+  providerCache[chainId] = new ethers.JsonRpcProvider(net.rpc);
+  return providerCache[chainId];
+}
+
+function getWalletForChain(chainId: number): ethers.Wallet {
+  if (walletCache[chainId]) return walletCache[chainId];
+  const provider = getProviderForChain(chainId);
+  walletCache[chainId] = new ethers.Wallet(cfg.relayerKey, provider);
+  return walletCache[chainId];
+}
 
 // ── Helpers ──
 
@@ -64,12 +83,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
   // Health check
   if (path === '/x402/health' && req.method === 'GET') {
-    const balance = await provider.getBalance(wallet.address);
+    const balance = await defaultProvider.getBalance(defaultWallet.address);
     return sendJson(res, 200, {
       status: 'ok',
       network: cfg.network,
-      chainId: networkCfg.chainId,
-      facilitator: wallet.address,
+      chainId: defaultNetworkCfg.chainId,
+      facilitator: defaultWallet.address,
       balanceCFX: ethers.formatEther(balance),
       paymentContract: cfg.network === 'testnet' ? cfg.paymentContract.testnet : cfg.paymentContract.mainnet,
     });
@@ -82,33 +101,44 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   try { body = await parseBody(req); }
   catch { return sendJson(res, 400, { error: 'Invalid request body' }); }
 
+  // Resolve provider/wallet for the request's chain
+  const reqChainId = body?.network?.chainId;
+  let reqProvider: ethers.JsonRpcProvider;
+  let reqWallet: ethers.Wallet;
+  try {
+    reqProvider = reqChainId ? getProviderForChain(reqChainId) : defaultProvider;
+    reqWallet = reqChainId ? getWalletForChain(reqChainId) : defaultWallet;
+  } catch {
+    return sendJson(res, 400, { error: `Unsupported chain: ${reqChainId}` });
+  }
+
   // ── EIP-3009 ──
   if (path === '/x402/verify-eip3009' && req.method === 'POST') {
-    const result = await verifyEip3009(body, provider);
+    const result = await verifyEip3009(body, reqProvider);
     return sendJson(res, 200, result);
   }
   if (path === '/x402/settle-eip3009' && req.method === 'POST') {
-    const result = await settleEip3009(body, wallet);
+    const result = await settleEip3009(body, reqWallet);
     return sendJson(res, result.success ? 200 : 500, result);
   }
 
   // ── ERC-20 ──
   if (path === '/x402/verify-erc20' && req.method === 'POST') {
-    const result = await verifyErc20(body, provider);
+    const result = await verifyErc20(body, reqProvider);
     return sendJson(res, 200, result);
   }
   if (path === '/x402/settle-erc20' && req.method === 'POST') {
-    const result = await settleErc20(body, wallet);
+    const result = await settleErc20(body, reqWallet);
     return sendJson(res, result.success ? 200 : 500, result);
   }
 
   // ── Native CFX ──
   if (path === '/x402/verify-native' && req.method === 'POST') {
-    const result = await verifyNative(body, provider);
+    const result = await verifyNative(body, reqProvider);
     return sendJson(res, 200, result);
   }
   if (path === '/x402/settle-native' && req.method === 'POST') {
-    const result = await settleNative(body, wallet);
+    const result = await settleNative(body, reqWallet);
     return sendJson(res, result.success ? 200 : 500, result);
   }
 
@@ -121,10 +151,11 @@ const server = http.createServer(handleRequest);
 
 async function start() {
   console.log('[facilitator] x402 Facilitator v1.0.0');
-  console.log(`[facilitator] Network: ${cfg.network} (chain ${networkCfg.chainId})`);
-  console.log(`[facilitator] Relayer: ${wallet.address}`);
+  console.log(`[facilitator] Default network: ${cfg.network} (chain ${defaultNetworkCfg.chainId})`);
+  console.log(`[facilitator] Supports: ${Object.entries(NETWORKS).map(([k, v]) => `${k}(${v.chainId})`).join(', ')}`);
+  console.log(`[facilitator] Relayer: ${defaultWallet.address}`);
 
-  const balance = await provider.getBalance(wallet.address);
+  const balance = await defaultProvider.getBalance(defaultWallet.address);
   console.log(`[facilitator] Balance: ${ethers.formatEther(balance)} CFX`);
 
   const contract = cfg.network === 'testnet' ? cfg.paymentContract.testnet : cfg.paymentContract.mainnet;
