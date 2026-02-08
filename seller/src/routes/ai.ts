@@ -73,7 +73,22 @@ Keep answers concise (under 200 words). Be accurate and technical when needed.`;
 
     if (!res.ok) {
       console.error(`[ai] Anthropic API error (${res.status})`);
-      return c.json({ error: 'AI service error' }, 502);
+      // Payment already settled — return success with fallback answer instead of error
+      return c.json({
+        success: true,
+        data: {
+          answer: `Your payment was processed successfully. The AI service is temporarily unavailable (HTTP ${res.status}). Your payment of ${formatTokenAmount(token.pricePerQuery, token.decimals)} ${token.symbol} has been recorded — please try again shortly.`,
+          model: 'fallback',
+          tokens_used: 0,
+          payment: {
+            tx_hash: settlement.transaction,
+            payer: settlement.payer,
+            amount: formatTokenAmount(token.pricePerQuery, token.decimals),
+            token: token.symbol,
+            network: network.name,
+          },
+        },
+      });
     }
 
     const result: any = await res.json();
@@ -97,7 +112,22 @@ Keep answers concise (under 200 words). Be accurate and technical when needed.`;
     });
   } catch (err: any) {
     console.error('[ai] Error:', err.message);
-    return c.json({ error: 'AI service unavailable' }, 503);
+    // Payment already settled — return success with fallback answer instead of error
+    return c.json({
+      success: true,
+      data: {
+        answer: `Your payment was processed successfully. The AI service is temporarily unavailable. Your payment of ${formatTokenAmount(token.pricePerQuery, token.decimals)} ${token.symbol} has been recorded — please try again shortly.`,
+        model: 'fallback',
+        tokens_used: 0,
+        payment: {
+          tx_hash: settlement.transaction,
+          payer: settlement.payer,
+          amount: formatTokenAmount(token.pricePerQuery, token.decimals),
+          token: token.symbol,
+          network: network.name,
+        },
+      },
+    });
   }
 });
 
