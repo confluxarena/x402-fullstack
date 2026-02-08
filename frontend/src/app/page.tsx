@@ -101,10 +101,29 @@ export default function Home() {
     setTyping(false);
   }, []);
 
-  const handleNetworkChange = (n: string) => {
+  const handleNetworkChange = async (n: string) => {
     setNetwork(n);
     setToken('CFX');
     resetTimeline();
+
+    // Switch wallet chain if already connected
+    if (address && providerRef.current) {
+      const targetNet = NETWORKS[n];
+      const chainIdHex = `0x${targetNet.chainId.toString(16)}`;
+      try {
+        await providerRef.current.send('wallet_switchEthereumChain', [{ chainId: chainIdHex }]);
+      } catch (err: any) {
+        if (err.code === 4902) {
+          await providerRef.current.send('wallet_addEthereumChain', [{
+            chainId: chainIdHex,
+            chainName: targetNet.name,
+            nativeCurrency: { name: 'CFX', symbol: 'CFX', decimals: 18 },
+            rpcUrls: [targetNet.rpcUrl],
+            blockExplorerUrls: [targetNet.explorerUrl],
+          }]);
+        }
+      }
+    }
   };
 
   const handleConnect = async () => {
@@ -273,6 +292,24 @@ export default function Home() {
     const q = question || 'What is Conflux Network?';
 
     try {
+      // Ensure wallet is on the correct chain before paying
+      const chainIdHex = `0x${net.chainId.toString(16)}`;
+      try {
+        await providerRef.current.send('wallet_switchEthereumChain', [{ chainId: chainIdHex }]);
+      } catch (switchErr: any) {
+        if (switchErr.code === 4902) {
+          await providerRef.current.send('wallet_addEthereumChain', [{
+            chainId: chainIdHex,
+            chainName: net.name,
+            nativeCurrency: { name: 'CFX', symbol: 'CFX', decimals: 18 },
+            rpcUrls: [net.rpcUrl],
+            blockExplorerUrls: [net.explorerUrl],
+          }]);
+        } else {
+          throw switchErr;
+        }
+      }
+
       const signer = await providerRef.current.getSigner();
       const url = `${SELLER_URL}/ai?q=${encodeURIComponent(q)}&token=${token}&network=${network}`;
 
