@@ -39,7 +39,7 @@
 | **Seller API** | Hono + TypeScript | x402 middleware, paid AI endpoint, free/premium data |
 | **Facilitator** | TypeScript + ethers.js 6 | Verifies payments & settles on-chain (native, ERC-20, EIP-3009) |
 | **Smart Contract** | Solidity 0.8.24 + Hardhat | Universal payment receiver — deployed on Testnet & Mainnet |
-| **Web Frontend** | Next.js 14 + Tailwind CSS | Timeline UI, wallet connect, network/token selector |
+| **Web Frontend** | Next.js 14 + Tailwind CSS | Timeline UI, multi-wallet modal (MetaMask, Fluent, OKX), network/token selector |
 | **AI Agent** | TypeScript CLI | Autonomous 5-step payment flow with spending caps |
 | **Database** | PostgreSQL 16 | Payment logs, invoices, rate limits, AI queries |
 
@@ -111,12 +111,12 @@ x402-fullstack/
 │       ├── middleware/x402.ts # Payment challenge + verification
 │       ├── routes/            # ai.ts, data.ts, health.ts
 │       ├── types.ts           # Typed Hono context (X402Env)
-│       └── index.ts           # Server entry (port 3850)
+│       └── index.ts           # Server entry
 ├── facilitator/               # Payment settlement service
 │   └── src/
 │       ├── handlers/          # eip3009.ts, erc20.ts, native.ts
 │       ├── config.ts          # ABIs, environment
-│       └── index.ts           # HTTP server (port 3849)
+│       └── index.ts           # HTTP server
 ├── frontend/                  # Next.js 14 + Tailwind
 │   └── src/
 │       ├── app/               # Pages: demo, history, admin, pay
@@ -462,7 +462,7 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 
 ## API Reference
 
-### Seller Endpoints (port 3850)
+### Seller Endpoints
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -472,7 +472,7 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | GET | `/data/premium` | x402 | Premium data (paid) |
 | GET | `/ai?q=...&token=CFX` | x402 | AI query (paid) |
 
-### Facilitator Endpoints (port 3849)
+### Facilitator Endpoints
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|

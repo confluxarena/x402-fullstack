@@ -23,6 +23,12 @@ const FACILITATOR_URL = `http://127.0.0.1:${env.facilitatorPort}`;
 
 const PAYMENT_ABI = [
   'function payNative(bytes32 invoiceId) external payable',
+  'function payWithToken(address token, uint256 amount, bytes32 invoiceId) external',
+];
+
+const ERC20_ABI = [
+  'function approve(address spender, uint256 amount) external returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
 ];
 
 /**
@@ -49,9 +55,12 @@ export function x402(tokenSymbol?: string) {
     const isDemo = c.req.query('demo') === '1';
 
     if (!paymentHeader) {
-      // Demo mode: server pays with its own key on testnet (native CFX only)
-      if (isDemo && networkName === 'testnet' && token.paymentMethod === 'native' && env.demoKey) {
-        const demoResult = await demoPayNative(network, token, paymentContract);
+      // Demo mode: server pays with its own key on testnet (native + erc20)
+      if (isDemo && networkName === 'testnet' && env.demoKey
+          && (token.paymentMethod === 'native' || token.paymentMethod === 'erc20')) {
+        const demoResult = token.paymentMethod === 'native'
+          ? await demoPayNative(network, token, paymentContract)
+          : await demoPayErc20(network, token, paymentContract);
         if (demoResult.success) {
           c.set('x402', demoResult);
           c.set('x402Token', token);
@@ -259,6 +268,47 @@ async function demoPayNative(
     };
   } catch (err: any) {
     console.error('[x402] Demo payment error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Demo mode: server pays ERC-20 token on testnet using its own agent key
+ */
+async function demoPayErc20(
+  network: NetworkConfig,
+  token: TokenConfig,
+  paymentContract: string,
+): Promise<SettlementResult> {
+  try {
+    const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+    const wallet = new ethers.Wallet(env.demoKey, provider);
+    const erc20 = new ethers.Contract(token.address, ERC20_ABI, wallet);
+    const contract = new ethers.Contract(paymentContract, PAYMENT_ABI, wallet);
+    const invoiceId = ethers.zeroPadValue(ethers.toUtf8Bytes('x402-demo'), 32);
+
+    // Approve if needed
+    const allowance: bigint = await erc20.allowance(wallet.address, paymentContract);
+    if (allowance < BigInt(token.pricePerQuery)) {
+      const approveTx = await erc20.approve(paymentContract, ethers.MaxUint256);
+      await approveTx.wait();
+      console.log(`[x402] Demo: approved ${token.symbol} for payment contract`);
+    }
+
+    const tx = await contract.payWithToken(token.address, token.pricePerQuery, invoiceId, {
+      gasLimit: 150_000,
+    });
+    const receipt = await tx.wait();
+
+    console.log(`[x402] Demo ERC-20 payment: ${receipt!.hash} (${token.symbol})`);
+
+    return {
+      success: true,
+      transaction: receipt!.hash,
+      payer: wallet.address,
+    };
+  } catch (err: any) {
+    console.error(`[x402] Demo ERC-20 payment error (${token.symbol}):`, err.message);
     return { success: false, error: err.message };
   }
 }

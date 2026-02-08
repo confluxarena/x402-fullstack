@@ -4,7 +4,14 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { NETWORKS, type Token } from '@/lib/networks';
 import { payAndFetch, formatAmount } from '@/lib/x402-client';
-import { connectWallet, getAddress, shortAddress } from '@/lib/wallet';
+import {
+  connectWallet,
+  getAddress,
+  shortAddress,
+  getWalletOptions,
+  type WalletType,
+  type WalletOption,
+} from '@/lib/wallet';
 
 const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
 
@@ -44,6 +51,9 @@ export default function Home() {
   const [address, setAddress] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const providerRef = useRef<ethers.BrowserProvider | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [walletOptions, setWalletOptions] = useState<WalletOption[]>([]);
+  const [walletName, setWalletName] = useState('');
 
   // Timeline state
   const [steps, setSteps] = useState<Step[]>([]);
@@ -126,13 +136,22 @@ export default function Home() {
     }
   };
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
+    setWalletOptions(getWalletOptions());
+    setShowWalletModal(true);
+    setError('');
+  };
+
+  const handleWalletSelect = async (wt: WalletType) => {
+    setShowWalletModal(false);
     setConnecting(true);
+    const option = walletOptions.find((w) => w.type === wt);
     try {
-      const provider = await connectWallet(net);
+      const provider = await connectWallet(wt, net);
       providerRef.current = provider;
       const addr = await getAddress(provider);
       setAddress(addr);
+      setWalletName(option?.name || wt);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -143,6 +162,7 @@ export default function Home() {
   const handleDisconnect = () => {
     setAddress(null);
     providerRef.current = null;
+    setWalletName('');
   };
 
   // Server Demo flow
@@ -192,14 +212,14 @@ export default function Home() {
         }
         await sleep(400);
 
-        // Step 3: Pay (server demo only supports native CFX on testnet)
-        const isTestnetNative = network === 'testnet' && token === 'CFX';
+        // Step 3: Pay failed (402 means demo payment not available for this token/network)
+        const isTestnet = network === 'testnet';
         updateStep('pay', {
           visible: true,
           status: 'error',
-          detail: isTestnetNative
-            ? 'Server demo payment failed.\nCheck server logs.'
-            : `Server demo only auto-pays native CFX on testnet.\nFor ${token} — use "Pay with Wallet" mode.`,
+          detail: isTestnet
+            ? 'Server demo payment failed.\nCheck server logs or token balance.'
+            : `Server demo auto-pays on testnet only.\nFor mainnet — use "Pay with Wallet" mode.`,
         });
         await sleep(300);
 
@@ -207,9 +227,9 @@ export default function Home() {
         updateStep('settle', { visible: true, status: 'error', detail: 'Payment required to proceed' });
 
         setError(
-          isTestnetNative
-            ? 'Server demo payment failed — check server configuration'
-            : `For ${token} payments — switch to "Pay with Wallet" mode`,
+          isTestnet
+            ? 'Server demo payment failed — check server logs'
+            : `For mainnet payments — switch to "Pay with Wallet" mode`,
         );
         return;
       }
@@ -463,6 +483,7 @@ export default function Home() {
             {address ? (
               <>
                 <span className="wallet-address">
+                  {walletName && <>{walletName} &middot; </>}
                   {shortAddress(address)}
                 </span>
                 <button className="btn-disconnect" onClick={handleDisconnect}>
@@ -604,6 +625,58 @@ export default function Home() {
           &middot; Multi-token payments on Conflux eSpace
         </div>
       </div>
+
+      {/* Wallet Selection Modal */}
+      {showWalletModal && (
+        <div
+          className="wallet-modal-overlay"
+          onClick={() => setShowWalletModal(false)}
+        >
+          <div
+            className="wallet-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="wallet-modal-header">
+              <span className="wallet-modal-title">Connect Wallet</span>
+              <button
+                className="wallet-modal-close"
+                onClick={() => setShowWalletModal(false)}
+              >
+                &#x2715;
+              </button>
+            </div>
+            {walletOptions.map((w) => (
+              <button
+                key={w.type}
+                className={`wallet-option ${!w.installed ? 'disabled' : ''}`}
+                onClick={() => {
+                  if (w.installed) {
+                    handleWalletSelect(w.type);
+                  } else {
+                    window.open(w.downloadUrl, '_blank');
+                  }
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="wallet-option-icon"
+                  src={w.icon}
+                  alt={w.name}
+                />
+                <div className="wallet-option-info">
+                  <div className="wallet-option-name">{w.name}</div>
+                  <div className="wallet-option-desc">{w.description}</div>
+                </div>
+                <span
+                  className={`wallet-option-badge ${w.installed ? 'installed' : 'not-installed'}`}
+                >
+                  {w.installed ? 'Detected' : 'Install'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }
