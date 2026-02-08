@@ -4,8 +4,9 @@
 
 import { Hono } from 'hono';
 import { x402 } from '../middleware/x402.js';
+import type { X402Env } from '../types.js';
 
-const data = new Hono();
+const data = new Hono<X402Env>();
 
 // Free endpoint — no payment required
 data.get('/free', (c) => {

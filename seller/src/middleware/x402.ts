@@ -16,21 +16,15 @@
 import type { Context, Next } from 'hono';
 import { env } from '../config/env.js';
 import { getNetwork, type TokenConfig, type NetworkConfig } from '../config/networks.js';
+import type { X402Env, SettlementResult } from '../types.js';
 
 const FACILITATOR_URL = `http://127.0.0.1:${env.facilitatorPort}`;
-
-interface SettlementResult {
-  success: boolean;
-  transaction?: string;
-  payer?: string;
-  error?: string;
-}
 
 /**
  * Creates x402 middleware for a specific token
  */
 export function x402(tokenSymbol?: string) {
-  return async (c: Context, next: Next) => {
+  return async (c: Context<X402Env>, next: Next) => {
     const network = getNetwork(env.network);
     const symbol = tokenSymbol || c.req.query('token') || getDefaultToken(network);
     const token = network.tokens[symbol];
@@ -100,11 +94,9 @@ function send402(c: Context, network: NetworkConfig, token: TokenConfig) {
         symbol: token.symbol,
         decimals: token.decimals,
         ...(token.eip712Name ? { name: token.eip712Name, version: token.eip712Version } : {}),
-        ...(token.paymentMethod !== 'native' ? {
-          paymentContract: env.network === 'testnet'
-            ? env.paymentContract.testnet
-            : env.paymentContract.mainnet,
-        } : {}),
+        paymentContract: env.network === 'testnet'
+          ? env.paymentContract.testnet
+          : env.paymentContract.mainnet,
       },
     }],
   };

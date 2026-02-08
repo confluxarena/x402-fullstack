@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
  * @title X402PaymentReceiver
  * @notice Universal payment receiver for x402 protocol on Conflux eSpace.
  *         Supports three payment methods:
- *           1. Native CFX — receive() with invoiceId in calldata
- *           2. ERC-20 — approve + transferFrom with invoiceId
+ *           1. Native CFX — payNative(invoiceId){value}
+ *           2. ERC-20 — buyer approves contract, relayer calls payWithTokenFrom
  *           3. EIP-3009 — gasless transferWithAuthorization (USDT0)
  *
  * @dev Emits PaymentReceived for every successful payment.
@@ -14,6 +14,7 @@ pragma solidity ^0.8.24;
  */
 
 interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
     function allowance(address owner, address spender) external view returns (uint256);
@@ -76,7 +77,7 @@ contract X402PaymentReceiver {
     }
 
     // ────────────────────────────────────────────
-    // 2. ERC-20 payment (approve + transferFrom)
+    // 2a. ERC-20 payment — buyer calls directly
     // ────────────────────────────────────────────
 
     /**
@@ -103,6 +104,41 @@ contract X402PaymentReceiver {
         require(success, "Token transfer failed");
 
         emit PaymentReceived(invoiceId, msg.sender, token, amount, "erc20");
+    }
+
+    // ────────────────────────────────────────────
+    // 2b. ERC-20 payment — relayer calls on behalf of buyer
+    // ────────────────────────────────────────────
+
+    /**
+     * @notice Settle ERC-20 payment on behalf of buyer.
+     *         Buyer must have approved this contract (not the relayer).
+     *         Only relayer (owner) can call this function.
+     * @param token     ERC-20 token address
+     * @param from      Buyer address who approved the spend
+     * @param amount    Payment amount
+     * @param invoiceId Unique invoice identifier
+     */
+    function payWithTokenFrom(
+        address token,
+        address from,
+        uint256 amount,
+        bytes32 invoiceId
+    ) external onlyOwner {
+        require(amount > 0, "Zero amount");
+        require(token != address(0), "Use payNative for CFX");
+        require(from != address(0), "Invalid payer");
+
+        IERC20 erc20 = IERC20(token);
+        require(
+            erc20.allowance(from, address(this)) >= amount,
+            "Insufficient allowance"
+        );
+
+        bool success = erc20.transferFrom(from, treasury, amount);
+        require(success, "Token transfer failed");
+
+        emit PaymentReceived(invoiceId, from, token, amount, "erc20");
     }
 
     // ────────────────────────────────────────────
@@ -162,13 +198,14 @@ contract X402PaymentReceiver {
         owner = newOwner;
     }
 
-    /// @notice Rescue stuck tokens (safety net)
+    /// @notice Rescue stuck tokens or CFX (safety net)
     function rescueTokens(address token, uint256 amount) external onlyOwner {
         if (token == address(0)) {
             (bool sent, ) = owner.call{value: amount}("");
             require(sent, "CFX rescue failed");
         } else {
-            IERC20(token).transferFrom(address(this), owner, amount);
+            bool sent = IERC20(token).transfer(owner, amount);
+            require(sent, "Token rescue failed");
         }
     }
 

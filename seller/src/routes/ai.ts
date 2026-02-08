@@ -6,8 +6,9 @@ import { Hono } from 'hono';
 import { x402 } from '../middleware/x402.js';
 import { env } from '../config/env.js';
 import { db } from '../config/database.js';
+import type { X402Env } from '../types.js';
 
-const ai = new Hono();
+const ai = new Hono<X402Env>();
 
 ai.get('/', x402(), async (c) => {
   const question = c.req.query('q')?.trim();

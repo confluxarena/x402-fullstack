@@ -81,8 +81,9 @@ export async function settleErc20(
       32,
     );
 
-    const tx = await contract.payWithToken(
+    const tx = await contract.payWithTokenFrom(
       token.address,
+      from,
       amount,
       invoiceBytes,
       { gasLimit: 300_000 },

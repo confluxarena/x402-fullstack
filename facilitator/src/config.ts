@@ -43,6 +43,7 @@ export const TRANSFER_AUTH_TYPES = {
 export const PAYMENT_RECEIVER_ABI = [
   'function payNative(bytes32 invoiceId) external payable',
   'function payWithToken(address token, uint256 amount, bytes32 invoiceId) external',
+  'function payWithTokenFrom(address token, address from, uint256 amount, bytes32 invoiceId) external',
   'function payWithAuthorization(address token, address from, uint256 amount, uint256 validAfter, uint256 validBefore, bytes32 nonce, bytes signature, bytes32 invoiceId) external',
   'event PaymentReceived(bytes32 indexed invoiceId, address indexed payer, address token, uint256 amount, string paymentMethod)',
 ];
