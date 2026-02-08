@@ -32,14 +32,14 @@ export const env = {
 
   // Facilitator
   facilitatorKey: process.env.FACILITATOR_KEY || '',
-  facilitatorPort: parseInt(process.env.FACILITATOR_PORT || '3849'),
+  facilitatorPort: parseInt(process.env.FACILITATOR_PORT || '3851'),
 
   // AI
   claudeApiKey: process.env.CLAUDE_API_KEY || '',
   claudeModel: process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022',
 
   // Seller
-  sellerPort: parseInt(process.env.SELLER_PORT || '3850'),
+  sellerPort: parseInt(process.env.SELLER_PORT || '3852'),
   priceCfx: process.env.API_PRICE_CFX || '1000000000000000',
   priceToken: process.env.API_PRICE_TOKEN || '100',
 

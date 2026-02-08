@@ -27,7 +27,7 @@ config({ path: resolve(__dirname, '../../.env') });
 
 // ── Config ──
 
-const API_URL = process.env.AGENT_API_URL || 'http://localhost:3850';
+const API_URL = process.env.AGENT_API_URL || 'http://localhost:3852';
 const SPEND_CAP = parseFloat(process.env.AGENT_SPEND_CAP || '1.0');
 const PRIVATE_KEY = process.env.AGENT_PRIVATE_KEY || '';
 

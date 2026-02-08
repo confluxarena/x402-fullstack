@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { NETWORKS } from '@/lib/networks';
 
-const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
+const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
 
 interface Stats {
   total_payments: number;

@@ -651,7 +651,12 @@ body {
 
 /* ── Mobile ── */
 @media (max-width: 480px) {
-  .hero { padding: 32px 16px 20px; }
+  .nav-bar { padding: 12px 12px 0; gap: 4px; }
+  .nav-logo { font-size: 13px; }
+  .nav-links { gap: 2px; flex-wrap: wrap; }
+  .nav-links a { font-size: 11px; padding: 4px 6px; }
+
+  .hero { padding: 24px 16px 20px; }
   .hero h1 { font-size: 24px; }
   .hero p { font-size: 13px; }
   .hero-badge { font-size: 10px; padding: 3px 10px; }

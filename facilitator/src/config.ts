@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '../../.env') });
 
 export const cfg = {
-  port: parseInt(process.env.FACILITATOR_PORT || '3849'),
+  port: parseInt(process.env.FACILITATOR_PORT || '3851'),
   apiKey: process.env.FACILITATOR_KEY || '',
   relayerKey: process.env.RELAYER_PRIVATE_KEY || '',
   treasury: process.env.TREASURY_ADDRESS || '',

@@ -13,7 +13,7 @@ import {
   type WalletOption,
 } from '@/lib/wallet';
 
-const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
+const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
 
 type Mode = 'server' | 'wallet';
 type StepStatus = 'pending' | 'active' | 'done' | 'error';

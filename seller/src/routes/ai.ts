@@ -24,6 +24,9 @@ ai.get('/', x402(), async (c) => {
   const token = c.get('x402Token');
   const network = c.get('x402Network');
 
+  // Log payment for every settled request (regardless of Claude API availability)
+  await logPayment(settlement, token, network, '/ai');
+
   // Fallback response when Claude API key is not configured
   if (!env.claudeApiKey) {
     return c.json({
@@ -76,8 +79,6 @@ Keep answers concise (under 200 words). Be accurate and technical when needed.`;
     const result: any = await res.json();
     const answer = result.content?.[0]?.text || '';
     const tokensUsed = (result.usage?.input_tokens || 0) + (result.usage?.output_tokens || 0);
-
-    await logPayment(settlement, token, network, '/ai');
 
     return c.json({
       success: true,

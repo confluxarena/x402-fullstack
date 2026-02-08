@@ -1,17 +1,17 @@
 {
   "info": {
     "name": "x402 Fullstack — Conflux eSpace",
-    "description": "x402 HTTP 402 Payment Required protocol endpoints for testing and development.\n\nSeller API (port 3850) + Facilitator (port 3849).",
+    "description": "x402 HTTP 402 Payment Required protocol endpoints for testing and development.\n\nSeller API (port 3852) + Facilitator (port 3851).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "seller_url",
-      "value": "http://localhost:3850"
+      "value": "http://localhost:3852"
     },
     {
       "key": "facilitator_url",
-      "value": "http://localhost:3849"
+      "value": "http://localhost:3851"
     }
   ],
   "item": [

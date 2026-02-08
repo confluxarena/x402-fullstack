@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { NETWORKS } from '@/lib/networks';
 
-const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3850';
+const SELLER_URL = process.env.NEXT_PUBLIC_SELLER_URL || 'http://localhost:3852';
 
 export default function PayPage() {
   const [network, setNetwork] = useState('testnet');
