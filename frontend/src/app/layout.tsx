@@ -17,7 +17,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <nav className="nav-bar">
+          <a href="/x402-app" className="nav-logo">x402</a>
+          <div className="nav-links">
+            <a href="/x402-app">Demo</a>
+            <a href="/x402-app/pay">API</a>
+            <a href="/x402-app/history">History</a>
+            <a href="/x402-app/admin">Admin</a>
+            <a
+              href="https://efaucet.confluxnetwork.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nav-faucet"
+            >
+              Faucet
+            </a>
+          </div>
+        </nav>
+        {children}
+      </body>
     </html>
   );
 }

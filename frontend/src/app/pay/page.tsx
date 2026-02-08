@@ -119,7 +119,9 @@ export default function PayPage() {
         )}
 
         <div className="x402-footer">
-          <a href="/x402-app">Back to Demo</a> &middot;{' '}
+          <a href="/x402-app">Demo</a> &middot;{' '}
+          <a href="/x402-app/history">History</a> &middot;{' '}
+          <a href="/x402-app/admin">Admin</a> &middot;{' '}
           <a href="https://www.x402.org" target="_blank" rel="noopener noreferrer">x402 Protocol</a>
         </div>
       </div>

@@ -19,6 +19,8 @@ import { getNetwork } from './config/networks.js';
 import { health } from './routes/health.js';
 import { data } from './routes/data.js';
 import { ai } from './routes/ai.js';
+import { payments } from './routes/payments.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
 
 const app = new Hono();
 
@@ -33,10 +35,15 @@ app.use('*', cors({
   ],
 }));
 
+// Rate limiting (60 req/min per IP for paid endpoints)
+app.use('/data/premium', rateLimiter(60));
+app.use('/ai', rateLimiter(30));
+
 // Routes
 app.route('/health', health);
 app.route('/data', data);
 app.route('/ai', ai);
+app.route('/payments', payments);
 
 // Token list endpoint
 app.get('/tokens', (c) => {
@@ -70,9 +77,11 @@ console.log(`[seller] Treasury: ${env.treasury}`);
 serve({ fetch: app.fetch, port: env.sellerPort }, () => {
   console.log(`[seller] Listening on http://localhost:${env.sellerPort}`);
   console.log(`[seller] Endpoints:`);
-  console.log(`  GET /health        (free)`);
-  console.log(`  GET /data/free     (free)`);
-  console.log(`  GET /data/premium  (x402)`);
-  console.log(`  GET /ai?q=...      (x402)`);
-  console.log(`  GET /tokens        (free)`);
+  console.log(`  GET /health            (free)`);
+  console.log(`  GET /data/free         (free)`);
+  console.log(`  GET /data/premium      (x402)`);
+  console.log(`  GET /ai?q=...          (x402)`);
+  console.log(`  GET /tokens            (free)`);
+  console.log(`  GET /payments/history   (free)`);
+  console.log(`  GET /payments/stats     (free)`);
 });

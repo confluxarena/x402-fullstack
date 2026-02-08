@@ -108,8 +108,9 @@ x402-fullstack/
 ├── seller/                    # Hono API server
 │   └── src/
 │       ├── config/            # networks.ts, database.ts, env.ts
-│       ├── middleware/x402.ts # Payment challenge + verification
-│       ├── routes/            # ai.ts, data.ts, health.ts
+│       ├── routes/            # ai.ts, data.ts, health.ts, payments.ts
+│       ├── services/          # payments.ts (logging, history, stats)
+│       ├── middleware/         # x402.ts, rateLimiter.ts
 │       ├── types.ts           # Typed Hono context (X402Env)
 │       └── index.ts           # Server entry
 ├── facilitator/               # Payment settlement service
@@ -323,8 +324,8 @@ docker compose up -d
 
 This starts:
 - **PostgreSQL 16** on port 5432 (auto-runs `database/schema.sql`)
-- **Facilitator** on port 3849
-- **Seller API** on port 3850
+- **Facilitator** on port 3851
+- **Seller API** on port 3852
 - **Frontend** on port 3000
 
 ### 3. Manual Setup
@@ -471,6 +472,8 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | GET | `/data/free` | None | Free data endpoint |
 | GET | `/data/premium` | x402 | Premium data (paid) |
 | GET | `/ai?q=...&token=CFX` | x402 | AI query (paid) |
+| GET | `/payments/history` | None | Paginated payment log |
+| GET | `/payments/stats` | None | Aggregated revenue and usage |
 
 ### Facilitator Endpoints
 
@@ -535,8 +538,8 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | `PAYMENT_CONTRACT_TESTNET` | Yes | `0xdd27...a022` | Contract on testnet |
 | `PAYMENT_CONTRACT_MAINNET` | Yes | `0x2496...8680` | Contract on mainnet |
 | `FACILITATOR_KEY` | Yes | — | Shared secret (seller ↔ facilitator) |
-| `FACILITATOR_PORT` | No | `3849` | Facilitator port |
-| `SELLER_PORT` | No | `3850` | Seller API port |
+| `FACILITATOR_PORT` | No | `3851` | Facilitator port |
+| `SELLER_PORT` | No | `3852` | Seller API port |
 | `CLAUDE_API_KEY` | Yes | — | Anthropic API key for AI endpoint |
 | `CLAUDE_MODEL` | No | `claude-3-5-haiku` | Claude model ID |
 | `DB_HOST` | Yes | `db` | PostgreSQL host |
@@ -546,7 +549,7 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | `DB_PASS` | Yes | — | Database password |
 | `AGENT_PRIVATE_KEY` | No | — | Agent wallet private key |
 | `AGENT_SPEND_CAP` | No | `1.0` | Max spend per session (token units) |
-| `AGENT_API_URL` | No | `http://localhost:3850` | Seller API URL for agent |
+| `AGENT_API_URL` | No | `http://localhost:3852` | Seller API URL for agent |
 
 ---
 
@@ -562,6 +565,7 @@ AGENT_PRIVATE_KEY=0x... npx tsx src/index.ts "Explain x402"
 | **EIP-712 recovery** | Signer address recovered and verified before settlement |
 | **Time windows** | `validBefore`/`validAfter` enforced on all EIP-3009 payments |
 | **Agent spending cap** | `AGENT_SPEND_CAP` prevents runaway spending |
+| **Rate limiting** | Per-IP sliding window (30 req/min AI, 60 req/min data) |
 | **Request body limit** | 1 MB limit on facilitator |
 | **CORS** | `Access-Control-Allow-Origin: *` with exposed x402 headers |
 

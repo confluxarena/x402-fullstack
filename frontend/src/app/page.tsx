@@ -607,12 +607,15 @@ export default function Home() {
 
         {/* Footer */}
         <div className="x402-footer">
+          <a href="/x402-app/pay">API</a> &middot;{' '}
+          <a href="/x402-app/history">History</a> &middot;{' '}
+          <a href="/x402-app/admin">Admin</a> &middot;{' '}
           <a
             href="https://github.com/confluxarena/x402-fullstack"
             target="_blank"
             rel="noopener noreferrer"
           >
-            x402 Fullstack
+            GitHub
           </a>{' '}
           &middot;{' '}
           <a
@@ -621,8 +624,7 @@ export default function Home() {
             rel="noopener noreferrer"
           >
             x402 Protocol
-          </a>{' '}
-          &middot; Multi-token payments on Conflux eSpace
+          </a>
         </div>
       </div>
 

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS x402_payments (
     tx_hash         VARCHAR(66) NOT NULL DEFAULT '',
     network         VARCHAR(20) NOT NULL,              -- CAIP-2: "eip155:71"
     payment_method  VARCHAR(10) NOT NULL CHECK (payment_method IN ('native', 'erc20', 'eip3009')),
+    endpoint        VARCHAR(128) NOT NULL DEFAULT '',
     settled_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

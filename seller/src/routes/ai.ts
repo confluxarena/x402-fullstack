@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { x402 } from '../middleware/x402.js';
 import { env } from '../config/env.js';
-import { db } from '../config/database.js';
+import { logPayment } from '../services/payments.js';
 import type { X402Env } from '../types.js';
 
 const ai = new Hono<X402Env>();
@@ -77,25 +77,7 @@ Keep answers concise (under 200 words). Be accurate and technical when needed.`;
     const answer = result.content?.[0]?.text || '';
     const tokensUsed = (result.usage?.input_tokens || 0) + (result.usage?.output_tokens || 0);
 
-    // Log payment to database
-    try {
-      await db.query(
-        `INSERT INTO x402_payments (invoice_id, payer_address, token_address, token_symbol, amount, tx_hash, network, payment_method, settled_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-        [
-          crypto.randomUUID().replace(/-/g, ''),
-          settlement.payer || '',
-          token.address,
-          token.symbol,
-          token.pricePerQuery,
-          settlement.transaction || '',
-          network.caip2,
-          token.paymentMethod,
-        ],
-      );
-    } catch (dbErr: any) {
-      console.error('[ai] DB log error:', dbErr.message);
-    }
+    await logPayment(settlement, token, network, '/ai');
 
     return c.json({
       success: true,

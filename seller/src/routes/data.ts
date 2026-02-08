@@ -4,6 +4,7 @@
 
 import { Hono } from 'hono';
 import { x402 } from '../middleware/x402.js';
+import { logPayment } from '../services/payments.js';
 import type { X402Env } from '../types.js';
 
 const data = new Hono<X402Env>();
@@ -28,6 +29,9 @@ data.get('/free', (c) => {
 data.get('/premium', x402(), async (c) => {
   const settlement = c.get('x402');
   const token = c.get('x402Token');
+  const network = c.get('x402Network');
+
+  await logPayment(settlement, token, network, '/data/premium');
 
   return c.json({
     success: true,
