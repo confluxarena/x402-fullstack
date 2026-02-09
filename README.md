@@ -11,6 +11,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
 [![Conflux eSpace](https://img.shields.io/badge/Conflux_eSpace-Testnet_%2B_Mainnet-00BFFF.svg)](https://confluxnetwork.org/)
 [![x402](https://img.shields.io/badge/x402-V2-FF6B00.svg)](https://www.x402.org)
+[![x402scan](https://img.shields.io/badge/x402scan-Registered-8B5CF6.svg)](https://www.x402scan.com/server/10e92a74-5040-4b72-818d-71044d022b72)
 
 ---
 
